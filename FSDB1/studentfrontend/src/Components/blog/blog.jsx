@@ -11,34 +11,38 @@ const Blog = () => {
   const [blogs, setBlogs] = useState([]);
   const [editingBlog, setEditingBlog] = useState(null);
 
+  // Fetch blogs when component mounts
   useEffect(() => {
     const username = localStorage.getItem("username");
     const email = localStorage.getItem("email");
     setUserName(username);
 
-    const fetchBlogs = async () => {
-      setLoading(true);
-
-      try {
-        const response = await axios.post("http://localhost:3000/api/blogs/get", { email });
-        const formattedBlogs = response.data.blogs.map((blog) => ({
-          id: blog._id,
-          title: blog.title,
-          content: blog.content,
-          status: blog.status,
-        }));
-        setBlogs(formattedBlogs);
-      } catch (error) {
-        console.error("Error fetching blogs:", error);
-        setMessage("An error occurred while fetching the blogs.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchBlogs();
+    if (email) {
+      fetchBlogs(email);
+    }
   }, []);
 
+  // Fetch blogs from backend
+  const fetchBlogs = async (email) => {
+    setLoading(true);
+    try {
+      const response = await axios.post("http://localhost:3000/api/admin/:postId", { email });
+      const formattedBlogs = response.data.blogs.map((blog) => ({
+        id: blog._id,
+        title: blog.title,
+        content: blog.content,
+        status: blog.status,
+      }));
+      setBlogs(formattedBlogs);
+    } catch (error) {
+      console.error("Error fetching blogs:", error);
+      setMessage("An error occurred while fetching the blogs.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle blog creation (add)
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -59,7 +63,7 @@ const Blog = () => {
     setLoading(true);
 
     try {
-      const response = await axios.post("http://localhost:3000/api/blogs/add", data);
+      const response = await axios.post("http://localhost:3000/api/admin/add", data);
 
       if (response.data.success) {
         alert("Blog added successfully!");
@@ -67,13 +71,8 @@ const Blog = () => {
         setContent("");
         setStatus("draft");
 
-        const formattedBlogs = response.data.blogs.map((blog) => ({
-          id: blog._id,
-          title: blog.title,
-          content: blog.content,
-          status: blog.status,
-        }));
-        setBlogs(formattedBlogs);
+        // Re-fetch blogs to update the list
+        fetchBlogs(email);
       } else {
         setMessage(response.data.message || "Failed to add blog.");
       }
@@ -85,112 +84,25 @@ const Blog = () => {
     }
   };
 
-
-// const addBlog = async (req, res) => {
-//     try {
-//       const { email, title, content, status } = req.body;
-  
-//       // Check if the email, title, content, and status are present
-//       if (!email || !title || !content || !status) {
-//         return res.status(400).json({ message: "All fields are required." });
-//       }
-  
-//       // Find the user by email
-//       const user = await User.findOne({ email });
-//       if (!user) {
-//         return res.status(404).json({ message: "User not found." });
-//       }
-  
-//       // Add new blog
-//       const newBlog = { title, content, status };
-//       user.blogs.push(newBlog); // Add blog to the user's blogs array
-//       await user.save();
-  
-//       res.status(200).json({
-//         message: "Blog added successfully.",
-//         success: true,
-//         blogs: user.blogs, // Return the updated list of blogs
-//       });
-//     } catch (error) {
-//       console.error("Error adding blog:", error.message);
-//       res.status(500).json({ message: "Internal Server Error", error: error.message });
-//     }
-//   };
-
-
-  
-  const addBlog = async (e) => {
-    e.preventDefault(); // Prevent default form submission
-  
-    const email = localStorage.getItem("email"); // Get the email from localStorage
-  
-    if (!email) {
-      alert("No email found. Please log in first.");
-      return;
-    }
-  
-    const data = {
-      email, // User's email
-      title, // Blog title
-      content, // Blog content
-      status, // Blog status (draft or published)
-    };
-  
-    setLoading(true);
-  
-    try {
-      const response = await axios.post("http://localhost:3000/api/blogs/add", data);
-  
-      if (response.data.success) {
-        alert("Blog added successfully!");
-  
-        // Reset form fields after successful addition
-        setTitle("");
-        setContent("");
-        setStatus("draft");
-  
-        // Update blogs list in state
-        const formattedBlogs = response.data.blogs.map((blog) => ({
-          id: blog._id,
-          title: blog.title,
-          content: blog.content,
-          status: blog.status,
-        }));
-        setBlogs(formattedBlogs);
-      } else {
-        setMessage(response.data.message || "Failed to add blog.");
-      }
-    } catch (error) {
-      console.error("Error adding blog:", error);
-      setMessage("An error occurred while adding the blog.");
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-
+  // Handle blog deletion
   const deleteBlog = async (id) => {
     const email = localStorage.getItem("email");
 
     try {
-      const response = await axios.post("http://localhost:3000/api/blogs/delete", { email, blogId: id });
+      const response = await axios.post("http://localhost:3000/api/admin/delete/:postId", { email, blogId: id });
       alert("Blog successfully deleted!");
-      const formattedBlogs = response.data.blogs.map((blog) => ({
-        id: blog._id,
-        title: blog.title,
-        content: blog.content,
-        status: blog.status,
-      }));
-      setBlogs(formattedBlogs);
+
+      // Re-fetch blogs to update the list
+      fetchBlogs(email);
     } catch (error) {
       console.error("Error deleting blog:", error);
       alert("Failed to delete the blog.");
     }
   };
 
+  // Handle blog update
   const handleUpdate = async (e) => {
     e.preventDefault();
-
     const email = localStorage.getItem("email");
 
     if (!email || !editingBlog) {
@@ -201,17 +113,13 @@ const Blog = () => {
     const data = {
       email,
       blogId: editingBlog.id,
-      newBlogData: {
-        title,
-        content,
-        status,
-      },
+      newBlogData: { title, content, status },
     };
 
     setLoading(true);
 
     try {
-      const response = await axios.post("http://localhost:3000/api/blogs/edit", data);
+      const response = await axios.post("http://localhost:3000/api/admin/editBlog", data);
 
       if (response.data.success) {
         alert("Blog updated successfully!");
@@ -219,14 +127,7 @@ const Blog = () => {
         setContent("");
         setStatus("draft");
         setEditingBlog(null);
-
-        const formattedBlogs = response.data.blogs.map((blog) => ({
-          id: blog._id,
-          title: blog.title,
-          content: blog.content,
-          status: blog.status,
-        }));
-        setBlogs(formattedBlogs);
+        fetchBlogs(email); // Refresh blogs
       } else {
         setMessage(response.data.message || "Failed to update blog.");
       }
@@ -238,6 +139,7 @@ const Blog = () => {
     }
   };
 
+  // Function to populate form fields for editing
   const editBlog = (blog) => {
     setEditingBlog(blog);
     setTitle(blog.title);
@@ -294,9 +196,6 @@ const Blog = () => {
               <strong>{blog.title}</strong> - {blog.status}
               <button onClick={() => editBlog(blog)} style={{ marginLeft: "10px" }}>
                 Edit
-              </button>
-              <button onClick={() => addBlog(blog.id)} style={{ marginLeft: "10px" }}>
-                add
               </button>
               <button onClick={() => deleteBlog(blog.id)} style={{ marginLeft: "10px" }}>
                 Delete
